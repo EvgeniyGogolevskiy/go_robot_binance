@@ -1,0 +1,4 @@
+*.txt
+/parametrs
+get_price_btc.go
+get_symbols.go
