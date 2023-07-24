@@ -2,9 +2,10 @@ package main
 
 import (
 	"encoding/json"
-	"robot/parametrs"
 	"log"
 	"net/http"
+	"robot/createOrder"
+	"robot/parametrs"
 	"strconv"
 	"strings"
 
@@ -59,9 +60,10 @@ func candlestickData(symbol string) {
 	avgAmpl := 1.0
 	position := false
 	count := false
-	side := ""
+	sides := ""
 	take_profit := 0.0
 	stop_loss := 0.0
+	quantity := ""
 
 	for {
 
@@ -131,7 +133,7 @@ func candlestickData(symbol string) {
 				continue
 			}
 			if klineData.K.X == true {
-				sliceAmpl = sliceAmplTmp[:parametrs.LenSliceAmplTmp - 1]
+				sliceAmpl = sliceAmplTmp[:parametrs.LenSliceAmplTmp-1]
 				sliceAmplTmp = sliceAmplTmp[1:]
 				sumAmpl := 0.0
 				for _, ampl := range sliceAmpl {
@@ -146,19 +148,23 @@ func candlestickData(symbol string) {
 				}
 				buyDivSell := klineVolBuy / (klineVolume - klineVolBuy)
 				otnoshAmpl := amplitude / float64(avgAmpl)
-				if buyDivSell > 1.1 && klineClose < klineHigh*(100-parametrs.MinFromAmpl*amplitude)/100 && klineClose > klineHigh*(100-parametrs.MaxFromAmpl*amplitude)/100 && amplitude > 3 {
-					log.Printf("short %s \t price: %v \t ampl: %.2f%% \t avg: %.2f%% \t otnosh: %.2f \t buyDivSell: %.2f", symbol, klineClose, amplitude, avgAmpl, otnoshAmpl, buyDivSell)
+				if buyDivSell > 1.1 && klineClose < klineHigh*(100-parametrs.MinFromAmpl*amplitude)/100 && klineClose > klineHigh*(100-parametrs.MaxFromAmpl*amplitude)/100 && amplitude > parametrs.PorogAmplShort {
+					sides = "short"
+					quantity = createOrder.SizeLot(parametrs.Dollars, klineClose, parametrs.Koef_stop)
+					createOrder.CreateOrder(symbol, sides, quantity)
 					position = true
-					side = "short"
 					take_profit = klineClose * (1 - amplitude*parametrs.ForTake)
 					stop_loss = klineClose * parametrs.ForStopShort
+					log.Printf("short %s \t price: %v \t ampl: %.2f%% \t avg: %.2f%% \t otnosh: %.2f \t buyDivSell: %.2f \t take_profit: %f \t stop_loss: %f", symbol, klineClose, amplitude, avgAmpl, otnoshAmpl, buyDivSell, take_profit, stop_loss)
 				}
-				if buyDivSell < 0.9 && klineClose > klineLow*(100+parametrs.MinFromAmpl*amplitude)/100 && klineClose < klineLow*(100+parametrs.MaxFromAmpl*amplitude)/100 && amplitude > 2 {
-					log.Printf("long %s \t price: %v \t ampl: %.2f%% \t avg: %.2f%% \t otnosh: %.2f \t buyDivSell: %.2f", symbol, klineClose, amplitude, avgAmpl, otnoshAmpl, buyDivSell)
+				if buyDivSell < 0.9 && klineClose > klineLow*(100+parametrs.MinFromAmpl*amplitude)/100 && klineClose < klineLow*(100+parametrs.MaxFromAmpl*amplitude)/100 && amplitude > parametrs.PorogAmplLong {
+					sides = "long"
+					quantity = createOrder.SizeLot(parametrs.Dollars, klineClose, parametrs.Koef_stop)
+					createOrder.CreateOrder(symbol, sides, quantity)
 					position = true
-					side = "long"
 					take_profit = klineClose * (1 + amplitude*parametrs.ForTake)
 					stop_loss = klineClose * parametrs.ForStopLong
+					log.Printf("long %s \t price: %v \t ampl: %.2f%% \t avg: %.2f%% \t otnosh: %.2f \t buyDivSell: %.2f \t take_profit: %f \t stop_loss: %f", symbol, klineClose, amplitude, avgAmpl, otnoshAmpl, buyDivSell, take_profit, stop_loss)
 				}
 			}
 		}
@@ -211,15 +217,11 @@ func candlestickData(symbol string) {
 			if klineData.K.X == true {
 				sliceAmplTmp = append(sliceAmplTmp, float64(amplitude))
 				if len(sliceAmplTmp) == parametrs.LenSliceAmplTmp {
-					count = true
 				}
 			}
 
-			if !count {
-				continue
-			}
 			if klineData.K.X == true {
-				sliceAmpl = sliceAmplTmp[:parametrs.LenSliceAmplTmp - 1]
+				sliceAmpl = sliceAmplTmp[:parametrs.LenSliceAmplTmp-1]
 				sliceAmplTmp = sliceAmplTmp[1:]
 				sumAmpl := 0.0
 				for _, ampl := range sliceAmpl {
@@ -228,30 +230,38 @@ func candlestickData(symbol string) {
 				avgAmpl = sumAmpl / float64(len(sliceAmpl))
 			}
 
-			if side == "long" {
+			if sides == "long" {
+				sides = "short"
 				if klineClose >= take_profit {
+					createOrder.CreateOrder(symbol, sides, quantity)
 					log.Printf("take_profit %s \t price: %v \t koef_stop: %v", symbol, klineClose, parametrs.Koef_stop)
 					position = false
 					parametrs.Koef_stop = parametrs.Koef_stop_default
 				}
 				if klineClose <= stop_loss {
+					createOrder.CreateOrder(symbol, sides, quantity)
 					log.Printf("stop_loss %s \t price: %v \t koef_stop: %v", symbol, klineClose, parametrs.Koef_stop)
 					position = false
-					parametrs.Koef_stop += 1
+					parametrs.Koef_stop *= 2
 				}
+				sides = "long"
 			}
 
-			if side == "short" {
+			if sides == "short" {
+				sides = "long"
 				if klineClose <= take_profit {
+					createOrder.CreateOrder(symbol, sides, quantity)
 					log.Printf("take_profit %s \t price: %v \t koef_stop: %v", symbol, klineClose, parametrs.Koef_stop)
 					position = false
 					parametrs.Koef_stop = parametrs.Koef_stop_default
 				}
 				if klineClose >= stop_loss {
+					createOrder.CreateOrder(symbol, sides, quantity)
 					log.Printf("stop_loss %s \t price: %v \t koef_stop: %v", symbol, klineClose, parametrs.Koef_stop)
 					position = false
-					parametrs.Koef_stop += 1
+					parametrs.Koef_stop *= 2
 				}
+				sides = "short"
 			}
 		}
 	}
