@@ -2,10 +2,12 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"robot/createOrder"
 	"robot/parametrs"
+	"robot/telegram"
 	"strconv"
 	"strings"
 
@@ -142,7 +144,7 @@ func candlestickData(symbol string) {
 				avgAmpl = sumAmpl / float64(len(sliceAmpl))
 			}
 
-			if amplitude > float64(avgAmpl)*parametrs.Koef && avgAmpl >= parametrs.PorogAvgAmpl {
+			if amplitude > float64(avgAmpl)*parametrs.KoefShort && avgAmpl >= parametrs.PorogAvgAmpl {
 				if (klineVolume - klineVolBuy) == 0.0 {
 					continue
 				}
@@ -155,16 +157,20 @@ func candlestickData(symbol string) {
 					position = true
 					take_profit = klineClose * (1 - amplitude*parametrs.ForTake)
 					stop_loss = klineClose * parametrs.ForStopShort
-					log.Printf("short %s \t price: %v \t ampl: %.2f%% \t avg: %.2f%% \t otnosh: %.2f \t buyDivSell: %.2f \t take_profit: %f \t stop_loss: %f", symbol, klineClose, amplitude, avgAmpl, otnoshAmpl, buyDivSell, take_profit, stop_loss)
+					msg := fmt.Sprintf("short %s \t price: %v \t ampl: %.2f%% \t avg: %.2f%% \t otnosh: %.2f \t buyDivSell: %.2f \t take_profit: %f \t stop_loss: %f", symbol, klineClose, amplitude, avgAmpl, otnoshAmpl, buyDivSell, take_profit, stop_loss)
+					log.Println(msg)
+					telegram.SendMessage(msg)
 				}
-				if buyDivSell < 0.9 && klineClose > klineLow*(100+parametrs.MinFromAmpl*amplitude)/100 && klineClose < klineLow*(100+parametrs.MaxFromAmpl*amplitude)/100 && amplitude > parametrs.PorogAmplLong {
+				if amplitude > float64(avgAmpl)*parametrs.KoefLong && buyDivSell < 0.9 && klineClose > klineLow*(100+parametrs.MinFromAmpl*amplitude)/100 && klineClose < klineLow*(100+parametrs.MaxFromAmpl*amplitude)/100 && amplitude > parametrs.PorogAmplLong {
 					sides = "long"
 					quantity = createOrder.SizeLot(parametrs.Dollars, klineClose, parametrs.Koef_stop)
 					createOrder.CreateOrder(symbol, sides, quantity)
 					position = true
 					take_profit = klineClose * (1 + amplitude*parametrs.ForTake)
 					stop_loss = klineClose * parametrs.ForStopLong
-					log.Printf("long %s \t price: %v \t ampl: %.2f%% \t avg: %.2f%% \t otnosh: %.2f \t buyDivSell: %.2f \t take_profit: %f \t stop_loss: %f", symbol, klineClose, amplitude, avgAmpl, otnoshAmpl, buyDivSell, take_profit, stop_loss)
+					msg := fmt.Sprintf("long %s \t price: %v \t ampl: %.2f%% \t avg: %.2f%% \t otnosh: %.2f \t buyDivSell: %.2f \t take_profit: %f \t stop_loss: %f", symbol, klineClose, amplitude, avgAmpl, otnoshAmpl, buyDivSell, take_profit, stop_loss)
+					log.Println(msg)
+					telegram.SendMessage(msg)
 				}
 			}
 		}
@@ -251,13 +257,17 @@ func candlestickData(symbol string) {
 				sides = "long"
 				if klineClose <= take_profit {
 					createOrder.CreateOrder(symbol, sides, quantity)
-					log.Printf("take_profit %s \t price: %v \t koef_stop: %v", symbol, klineClose, parametrs.Koef_stop)
+					msg := fmt.Sprintf("take_profit %s \t price: %v \t koef_stop: %v", symbol, klineClose, parametrs.Koef_stop)
+					log.Println(msg)
+					telegram.SendMessage(msg)
 					position = false
 					parametrs.Koef_stop = parametrs.Koef_stop_default
 				}
 				if klineClose >= stop_loss {
 					createOrder.CreateOrder(symbol, sides, quantity)
-					log.Printf("stop_loss %s \t price: %v \t koef_stop: %v", symbol, klineClose, parametrs.Koef_stop)
+					msg := fmt.Sprintf("stop_loss %s \t price: %v \t koef_stop: %v", symbol, klineClose, parametrs.Koef_stop)
+					log.Println(msg)
+					telegram.SendMessage(msg)
 					position = false
 					parametrs.Koef_stop *= 2
 				}
