@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"math"
-	"os"
 	"robot/parametrs"
 
 	"github.com/adshao/go-binance/v2/futures"
@@ -34,7 +33,7 @@ func SizeLot(quantity, price, koef float64) string {
 	return strlot
 }
 
-func CreateOrder(symbol, sides, quantity string) {
+func CreateOrder(symbol, sides, quantity string) bool {
 
 	// Создание клиента Binance Futures
 	client := futures.NewClient(parametrs.ApiKey, parametrs.SecretKey)
@@ -57,7 +56,8 @@ func CreateOrder(symbol, sides, quantity string) {
 	// Открытие маркет-ордера
 	_, err := createOrderService.Do(ctx)
 	if err != nil {
-		log.Println("Ошибка при создании маркет-ордера:", err)
-		os.Exit(1)
+		log.Println("Ошибка при создании маркет-ордера:", err, symbol)
+		return false
 	}
+	return true
 }
