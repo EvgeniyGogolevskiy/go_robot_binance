@@ -305,7 +305,7 @@ func main() {
 
 		go candlestickData(symbol)
 	}
-	log.Println("Start")
+	log.Println("Start, количество фьючерсов =", len(futuresInfo))
 
 	select {} // Ожидание бесконечного потока
 }
